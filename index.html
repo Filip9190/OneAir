@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <!--
+    One Air – Prototyp frontend-only
+    - Rezerwacje lotów z płatnością na lotnisku
+    - Brak lotów demo; admin dodaje ofertę
+    - Rezerwacja bez logowania; wymagane pełne dane pasażerów
+    - LocalStorage jako proste repozytorium danych
+    - Rozbudowany CSS, a11y, walidacje, narzędzia admina
+  -->
+
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>One Air — Rezerwuj lot (płatność na lotnisku)</title>
+
+  <!-- Podstawowe style -->
+  <style>
+    :root {
+      /* Kolory brandu i tła */
+      --primary: #0b6ef3;
+      --primary-600: #0a5bd0;
+      --primary-700: #0849a8;
+      --accent: #0ea5a5;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --bg: #f7f8fb;
+      --card: #ffffff;
+      --border: #e5e7eb;
+      --danger: #d61f1f;
+      --warning: #f59e0b;
+      --success: #16a34a;
+
+      /* Cienie i promienie */
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow-md: 0 2px 8px rgba(0,0,0,0.08);
+      --radius: 12px;
+
+      /* Rozmiary */
+      --maxw: 1200px;
+      --pad: 16px;
+    }
+
+    /* Reset */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.4;
+    }
+
+    /* Nagłówek */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+    }
+    .topbar {
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 12px var(--pad);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--primary);
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
+    .logo {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: var(--primary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 14px;
+      box-shadow: var(--shadow-sm);
+      user-select: none;
+    }
+
+    /* Nawigacja */
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    nav a {
+      text-decoration: none;
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 8px;
+      transition: background 0.15s ease, color 0.15s ease;
+      font-weight: 500;
+    }
+    nav a:hover {
+      background: #f1f5f9;
+    }
+    nav a.active {
+      background: #eef2ff;
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    /* CTA login */
+    .cta {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 10px;
+      box-shadow: var(--shadow-sm);
+      transition: background 0.15s ease;
+      font-weight: 700;
+    }
+    .cta:hover {
+      background: var(--primary-600);
+    }
+
+    /* Kontener i karty */
+    .container {
+      max-width: var(--maxw);
+      margin: 24px auto;
+      padding: 0 var(--pad);
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+    .card header {
+      border: none;
+      box-shadow: none;
+      position: static;
+    }
+
+    /* Siatka */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 12px;
+    }
+    .col-3 { grid-column: span 3; }
+    .col-4 { grid-column: span 4; }
+    .col-6 { grid-column: span 6; }
+    .col-8 { grid-column: span 8; }
+    .col-12 { grid-column: span 12; }
+    @media (max-width: 900px) {
+      .col-3, .col-4, .col-6, .col-8 { grid-column: span 12; }
+    }
+
+    /* Formularze */
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin: 6px 0 4px;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      font-size: 14px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(11, 110, 243, 0.15);
+    }
+    .help {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .error {
+      font-size: 12px;
+      color: var(--danger);
+      margin-top: 4px;
+    }
+
+    /* Przycisk */
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-weight: 700;
+      box-shadow: var(--shadow-sm);
+      transition: background 0.15s ease, transform 0.05s ease;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-600); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-warning { background: var(--warning); color: #fff; }
+    .btn-muted { background: #fff; color: var(--text); border: 1px solid var(--border); }
+    .inline { display: inline-flex; align-items: center; gap: 8px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+    /* Elementy lotów */
+    .flight-item {
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin: 8px 0;
+      background: #fff;
+      transition: background 0.15s ease, border-color 0.15s ease;
+      cursor: pointer;
+    }
+    .flight-item:hover {
+      background: #f0f7ff;
+      border-color: #c9ddff;
+    }
+    .kicker {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .title {
+      font-weight: 800;
+      margin-bottom: 4px;
+      color: #0b1220;
+    }
+    .pill {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    /* Tabela */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+    thead {
+      background: #f9fafb;
+    }
+    tbody tr:hover {
+      background: #f7fbff;
+    }
+
+    /* Stopka */
+    footer {
+      margin-top: 32px;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      padding: 16px var(--pad);
+      text-align: center;
+    }
+
+    /* Ukrywanie */
+    .hidden { display: none !important; }
+
+    /* Alerts (inline) */
+    .alert {
+      border: 1px solid var(--border);
+      background: #fffdf5;
+      color: #6b4d1f;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+
+    /* Druk potwierdzenia */
+    @media print {
+      header, nav, .cta, #adminTab { display: none !important; }
+      .card { box-shadow: none; border: none; }
+      body { background: #fff; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Pasek górny -->
+  <header role="banner" aria-label="Górny pasek nawigacyjny">
+    <div class="topbar">
+      <div class="brand" aria-label="Logo One Air">
+        <div class="logo" aria-hidden="true">OA</div>
+        <span>One Air</span>
+      </div>
+
+      <nav role="navigation" aria-label="Główna nawigacja">
+        <a href="#" data-view="home" class="active">Strona główna</a>
+        <a href="#" data-view="search">Znajdź lot</a>
+        <a href="#" data-view="my">Moje loty</a>
+        <a href="#" data-view="account">Konto</a>
+        <a href="#" data-view="admin" id="adminTab" class="hidden">Panel admin</a>
+      </nav>
+
+      <a href="#" class="cta" data-view="account" id="loginCta" aria-label="Przejdź do logowania">Zaloguj się</a>
+    </div>
+  </header>
+
+  <!-- Zawartość -->
+  <main class="container" role="main">
+    <!-- Strona główna -->
+    <section id="view-home" class="card" aria-labelledby="home-title">
+      <h1 id="home-title">Witamy w One Air</h1>
+      <p>
+        Rezerwuj loty z płatnością wyłącznie na lotnisku. Najpierw znajdź interesujący lot,
+        kliknij, aby zobaczyć jego szczegóły, a następnie wypełnij formularz dla wszystkich pasażerów.
+      </p>
+      <div class="grid">
+        <div class="col-6">
+          <div class="card">
+            <h2>Jak to działa</h2>
+            <ul>
+              <li><strong>Wyszukiwanie:</strong> Przeglądaj lub filtruj loty. Filtry są opcjonalne.</li>
+              <li><strong>Szczegóły lotu:</strong> Kliknij lot, aby zobaczyć pełne informacje.</li>
+              <li><strong>Rezerwacja:</strong> Podaj PESEL, imię i nazwisko, datę urodzenia dla każdego pasażera.</li>
+              <li><strong>Płatność:</strong> Wyłącznie na lotnisku przy odprawie.</li>
+            </ul>
+            <p class="help">Loty pojawią się, gdy administrator doda je w panelu.</p>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="card">
+            <h2>Informacje</h2>
+            <ul>
+              <li><strong>Bagaż podręczny:</strong> 1 sztuka w cenie (mały plecak/torba).</li>
+              <li><strong>Bagaż rejestrowany:</strong> dostępny za dopłatą — płatność na lotnisku.</li>
+              <li><strong>Zmiany rezerwacji:</strong> do 24h przed odlotem (jeśli są miejsca).</li>
+              <li><strong>Anulowanie:</strong> możliwe z poziomu „Moje loty”.</li>
+            </ul>
+            <div class="pill">Płatność tylko na lotnisku</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Wyszukiwanie lotów -->
+    <section id="view-search" class="card hidden" aria-labelledby="search-title">
+      <h2 id="search-title">Znajdź lot</h2>
+
+      <!-- Filtry opcjonalne -->
+      <div class="grid">
+        <div class="col-4">
+          <label for="fltFrom">Skąd</label>
+          <input id="fltFrom" placeholder="np. Kraków (KRK)" aria-label="Miasto wylotu" />
+        </div>
+        <div class="col-4">
+          <label for="fltTo">Dokąd</label>
+          <input id="fltTo" placeholder="np. Gdańsk (GDN)" aria-label="Miasto przylotu" />
+        </div>
+        <div class="col-4">
+          <label for="fltDate">Data</label>
+          <input id="fltDate" type="date" aria-label="Data lotu" />
+        </div>
+      </div>
+
+      <div class="inline" style="margin-top: 10px;">
+        <button class="btn-primary" id="searchBtn">Szukaj</button>
+        <button class="btn-muted" id="resetBtn">Wyczyść</button>
+      </div>
+
+      <!-- Wyniki -->
+      <div id="searchResults" style="margin-top: 16px;"></div>
+      <div id="noSearchInfo" class="alert hidden" role="status">Brak lotów dla podanych kryteriów.</div>
+    </section>
+
+    <!-- Szczegóły lotu + rezerwacja -->
+    <section id="view-flight" class="card hidden" aria-labelledby="flight-title">
+      <h2 id="flight-title">Szczegóły lotu</h2>
+
+      <div id="flightDetails" class="card" aria-live="polite"></div>
+
+      <div class="card">
+        <h3>Rezerwacja</h3>
+
+        <!-- Liczba pasażerów -->
+        <div class="grid">
+          <div class="col-4">
+            <label for="passengersCount">Ilość pasażerów</label>
+            <input id="passengersCount" type="number" min="1" value="1" aria-label="Ilość pasażerów" />
+            <p class="help">Podaj liczbę osób i wygeneruj formularze dla każdego pasażera.</p>
+          </div>
+          <div class="col-8">
+            <div class="inline" style="margin-top: 28px;">
+              <button class="btn-primary" id="genFormBtn">Utwórz formularze</button>
+              <button class="btn-muted" id="clearFormsBtn">Wyczyść formularze</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Formularze pasażerów -->
+        <div id="passengerForms" style="margin-top: 12px;"></div>
+
+        <!-- Akcje rezerwacji -->
+        <div class="inline" style="margin-top: 12px;">
+          <button class="btn-success" id="reserveBtn">Zarezerwuj</button>
+          <button class="btn-muted" id="printBtn">Drukuj potwierdzenie</button>
+        </div>
+
+        <!-- Walidacja globalna -->
+        <p id="reservationMsg" class="error hidden" aria-live="assertive"></p>
+      </div>
+    </section>
+
+    <!-- Moje loty -->
+    <section id="view-my" class="card hidden" aria-labelledby="my-title">
+      <h2 id="my-title">Moje loty</h2>
+      <p class="help">Poniższa lista pokazuje rezerwacje zapisane w tej przeglądarce.</p>
+      <div id="myFlights"></div>
+      <div id="noMyFlights" class="alert hidden">Nie masz jeszcze żadnych rezerwacji.</div>
+    </section>
+
+    <!-- Konto (logowanie tylko dla admina) -->
+    <section id="view-account" class="card hidden" aria-labelledby="account-title">
+      <h2 id="account-title">Konto</h2>
+      <p class="help">Panel administratora jest dostępny tylko po zalogowaniu na konto administratora.</p>
+
+      <div class="grid">
+        <div class="col-6">
+          <div class="card">
+            <h3>Logowanie</h3>
+            <label for="loginEmail">Email</label>
+            <input id="loginEmail" type="email" placeholder="admin@example.com" />
+            <label for="loginPassword">Hasło</label>
+            <input id="loginPassword" type="password" placeholder="••••••••" />
+            <div class="inline" style="margin-top: 10px;">
+              <button class="btn-primary" id="loginBtn">Zaloguj</button>
+              <button class="btn-muted" id="logoutBtn">Wyloguj</button>
+            </div>
+            <p id="accountMsg" class="help" style="margin-top: 8px;"></p>
+          </div>
+        </div>
+
+        <div class="col-6">
+          <div class="card">
+            <h3>Informacje o koncie</h3>
+            <ul>
+              <li><strong>Admin:</strong> admin@example.com (hasło: admin)</li>
+              <li><strong>Użytkownicy:</strong> nie są wymagani do rezerwacji</li>
+              <li><strong>Dane:</strong> zapisywane w LocalStorage</li>
+            </ul>
+            <p class="pill">Płatność tylko na lotnisku</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel admin -->
+    <section id="view-admin" class="card hidden" aria-labelledby="admin-title">
+      <h2 id="admin-title">Panel administracyjny</h2>
+      <p class="help">Dodawaj, edytuj i usuwaj loty. Przeglądaj rezerwacje pasażerów. Import/eksport danych.</p>
+
+      <!-- Formularz lotu -->
+      <div class="grid">
+        <div class="col-6">
+          <div class="card">
+            <h3>Dodaj / edytuj lot</h3>
+
+            <label for="admFrom">Skąd</label>
+            <input id="admFrom" placeholder="np. Kraków (KRK)" />
+
+            <label for="admTo">Dokąd</label>
+            <input id="admTo" placeholder="np. Warszawa (WAW)" />
+
+            <label for="admDate">Data</label>
+            <input id="admDate" type="date" />
+
+            <label for="admTime">Godzina</label>
+            <input id="admTime" type="time" />
+
+            <label for="admPrice">Cena (PLN)</label>
+            <input id="admPrice" type="number" min="0" step="1" placeholder="np. 249" />
+
+            <label for="admSeats">Miejsca</label>
+            <input id="admSeats" type="number" min="1" step="1" placeholder="np. 180" />
+
+            <div class="inline" style="margin-top: 10px;">
+              <button class="btn-success" id="saveFlightBtn">Zapisz lot</button>
+              <button class="btn-muted" id="clearFlightFormBtn">Wyczyść</button>
+            </div>
+
+            <p id="adminFormMsg" class="error hidden" style="margin-top: 6px;"></p>
+          </div>
+        </div>
+
+        <!-- Lista lotów -->
+        <div class="col-6">
+          <div class="card">
+            <h3>Aktualne loty</h3>
+            <table id="adminFlightsTable" aria-label="Tabela lotów">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Trasa</th>
+                  <th>Data</th>
+                  <th>Cena</th>
+                  <th>Miejsca</th>
+                  <th>Akcje</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+            <div class="inline" style="margin-top: 10px;">
+              <button class="btn-warning" id="exportDataBtn">Eksportuj JSON</button>
+              <button class="btn-muted" id="importDataBtn">Importuj JSON</button>
+              <input id="importFile" type="file" accept="application/json" class="hidden" />
+            </div>
+          </div>
+
+          <!-- Rezerwacje -->
+          <div class="card" style="margin-top: 16px;">
+            <h3>Rezerwacje</h3>
+            <table id="adminBookingsTable" aria-label="Tabela rezerwacji">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Lot</th>
+                  <th>Pasażerowie</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Stopka -->
+  <footer role="contentinfo">
+    © One Air — płatność tylko na lotnisku
+  </footer>
+
+  <!-- Logika aplikacji -->
+  <script>
+    // Klucze magazynu
+    const STORE_KEYS = {
+      flights: 'oneair_flights',
+      bookings: 'oneair_bookings',
+      users:   'oneair_users',
+      session: 'oneair_session'
+    };
+
+    // Konto administratora (bez prywatnych danych)
+    const ADMIN_EMAIL = 'admin@example.com';
+    const ADMIN_PASS  = 'admin';
+
+    // Proste aliasy
+    const   $  = (sel) => document.querySelector(sel);
+    const  $$  = (sel) => document.querySelectorAll(sel);
+
+    // LocalStorage helpers
+    function load(key) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        console.warn('Błąd odczytu LS:', key, e);
+        return [];
+      }
+    }
+    function save(key, val) {
+      try {
+        localStorage.setItem(key, JSON.stringify(val));
+      } catch (e) {
+        alert('Nie udało się zapisać danych (LocalStorage).');
+      }
+    }
+    function loadSession() {
+      try {
+        const raw = localStorage.getItem(STORE_KEYS.session);
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
+      }
+    }
+    function saveSession(s) {
+      localStorage.setItem(STORE_KEYS.session, JSON.stringify(s));
+    }
+
+    // Generator ID
+    function genId() {
+      return Math.random().toString(36).slice(2, 10);
+    }
+
+    // Inicjalizacja bez lotów demo: dodajemy tylko konto admina
+    function initUsers() {
+      const users = load(STORE_KEYS.users);
+      const hasAdmin = users.find(u => u.email === ADMIN_EMAIL);
+      if (!hasAdmin) {
+        users.push({ email: ADMIN_EMAIL, password: ADMIN_PASS });
+        save(STORE_KEYS.users, users);
+      }
+    }
+
+    // Nawigacja widoków
+    function show(view) {
+      $$('#view-home, #view-search, #view-flight, #view-my, #view-account, #view-admin')
+        .forEach(el => el.classList.add('hidden'));
+      const target = $('#view-' + view);
+      if (target) target.classList.remove('hidden');
+      // Aktywacja linku
+      $$('nav a').forEach(a => a.classList.toggle('active', a.dataset.view === view));
+    }
+
+    // UI sesji: pokazuj/ukrywaj admin tab
+    function refreshSessionUI() {
+      const s = loadSession();
+      $('#loginCta').textContent = s ? 'Konto' : 'Zaloguj się';
+      $('#adminTab').classList.toggle('hidden', !(s && s.email === ADMIN_EMAIL));
+    }
+
+    // Filtry wyszukiwania
+    function applySearchFilters(flights) {
+      const from = $('#fltFrom').value.trim().toLowerCase();
+      const to   = $('#fltTo').value.trim().toLowerCase();
+      const date = $('#fltDate').value.trim();
+      return flights.filter(f => {
+        const okFrom = !from || f.from.toLowerCase().includes(from);
+        const okTo   = !to   || f.to.toLowerCase().includes(to);
+        const okDate = !date || f.date === date;
+        return okFrom && okTo && okDate;
+      });
+    }
+
+    // Render wyników wyszukiwania
+    function renderSearchResults() {
+      const flights = load(STORE_KEYS.flights);
+      const list    = applySearchFilters(flights);
+      const c       = $('#searchResults');
+      const empty   = $('#noSearchInfo');
+
+      c.innerHTML = '';
+      empty.classList.toggle('hidden', list.length !== 0);
+
+      if (list.length === 0) return;
+
+      list.forEach(f => {
+        const div = document.createElement('div');
+        div.className = 'flight-item';
+        div.setAttribute('role', 'button');
+        div.setAttribute('aria-label', `Lot ${f.from} do ${f.to} dnia ${f.date} o ${f.time}`);
+        div.innerHTML = `
+          <div class="kicker">ID: ${f.id}</div>
+          <div class="title">${f.from} → ${f.to}</div>
+          <div>${f.date}, ${f.time}</div>
+          <div class="help">Cena: ${f.price} PLN • Dostępne miejsca: ${f.seats}</div>
+          <div class="pill">Płatność na lotnisku</div>
+        `;
+        div.addEventListener('click', () => openFlightDetails(f.id));
+        c.appendChild(div);
+      });
+    }
+
+    // Otwórz szczegóły lotu
+    let currentFlightId = null;
+    function openFlightDetails(flightId) {
+      const flights = load(STORE_KEYS.flights);
+      const f = flights.find(x => x.id === flightId);
+      if (!f) {
+        alert('Ten lot nie istnieje.');
+        return;
+      }
+
+      currentFlightId = flightId;
+      show('flight');
+
+      $('#flightDetails').innerHTML = `
+        <div class="row">
+          <div>
+            <div class="title">${f.from} → ${f.to}</div>
+            <div>${f.date}, ${f.time}</div>
+            <div class="help">Cena: ${f.price} PLN • Dostępne miejsca: ${f.seats}</div>
+            <div class="pill">Płatność na lotnisku</div>
+          </div>
+          <div class="inline">
+            <button class="btn-muted" id="backToSearchBtn">Wróć do wyszukiwania</button>
+          </div>
+        </div>
+      `;
+
+      // przycisk powrotu
+      $('#backToSearchBtn').onclick = () => { show('search'); };
+
+      // Wyczyszczenie formularzy
+      $('#passengerForms').innerHTML = '';
+      $('#reservationMsg').classList.add('hidden');
+      $('#reservationMsg').textContent = '';
+      $('#passengersCount').value = 1;
+    }
+
+    // Walidator PESEL (prosty: 11 cyfr + suma kontrolna)
+    function validatePESEL(pesel) {
+      const digits = (pesel || '').replace(/\D/g, '');
+      if (digits.length !== 11) return false;
+      const w = [1,3,7,9,1,3,7,9,1,3];
+      let sum = 0;
+      for (let i = 0; i < 10; i++) sum += w[i] * parseInt(digits[i], 10);
+      const ctrl = (10 - (sum % 10)) % 10;
+      return ctrl === parseInt(digits[10], 10);
+    }
+
+    // Generuj formularze pasażerów
+    function generatePassengerForms() {
+      const flights = load(STORE_KEYS.flights);
+      const f = flights.find(x => x.id === currentFlightId);
+      if (!f) {
+        alert('Lot niedostępny.');
+        return;
+      }
+
+      const count = parseInt($('#passengersCount').value, 10);
+      if (isNaN(count) || count < 1) {
+        showError('reservationMsg', 'Podaj poprawną liczbę pasażerów (min. 1).');
+        return;
+      }
+      if (count > f.seats) {
+        showError('reservationMsg', `Za dużo pasażerów. Dostępne miejsca: ${f.seats}.`);
+        return;
+      }
+
+      $('#reservationMsg').classList.add('hidden');
+      $('#reservationMsg').textContent = '';
+
+      const container = $('#passengerForms');
+      container.innerHTML = '';
+
+      for (let i = 0; i < count; i++) {
+        const idx = i + 1;
+        const form = document.createElement('div');
+        form.className = 'card';
+        form.innerHTML = `
+          <h4>Pasażer ${idx}</h4>
+
+          <label>Imię i nazwisko</label>
+          <input data-field="name_${i}" placeholder="np. Jan Kowalski" />
+
+          <label>PESEL</label>
+          <input data-field="pesel_${i}" placeholder="11 cyfr" />
+
+          <label>Data urodzenia</label>
+          <input type="date" data-field="dob_${i}" />
+
+          <p class="help">Upewnij się, że wszystkie dane są zgodne z dokumentem tożsamości.</p>
+          <p class="error hidden" data-error="err_${i}"></p>
+        `;
+        container.appendChild(form);
+      }
+    }
+
+    // Wyczyść formularze
+    function clearPassengerForms() {
+      $('#passengerForms').innerHTML = '';
+      $('#reservationMsg').classList.add('hidden');
+      $('#reservationMsg').textContent = '';
+    }
+
+    // Wyświetl błąd w elemencie
+    function showError(id, msg) {
+      const el = $('#' + id);
+      if (!el) return;
+      el.classList.remove('hidden');
+      el.textContent = msg;
+    }
+
+    // Zbierz i zwaliduj dane pasażerów
+    function collectPassengers() {
+      const container = $('#passengerForms');
+      const cards = container.querySelectorAll('.card');
+      const passengers = [];
+
+      if (cards.length === 0) {
+        showError('reservationMsg', 'Najpierw utwórz formularze pasażerów.');
+        return null;
+      }
+
+      for (let i = 0; i < cards.length; i++) {
+        const name  = container.querySelector(`[data-field="name_${i}"]`)?.value.trim();
+        const pesel = container.querySelector(`[data-field="pesel_${i}"]`)?.value.trim();
+        const dob   = container.querySelector(`[data-field="dob_${i}"]`)?.value;
+
+        const errEl = container.querySelector(`[data-error="err_${i}"]`);
+        errEl.classList.add('hidden');
+        errEl.textContent = '';
+
+        if (!name || !pesel || !dob) {
+          errEl.textContent = 'Uzupełnij wszystkie pola dla tego pasażera.';
+          errEl.classList.remove('hidden');
+          return null;
+        }
+        // Podstawowa walidacja PESEL
+        if (!validatePESEL(pesel)) {
+          errEl.textContent = 'Nieprawidłowy PESEL. Sprawdź 11 cyfr i sumę kontrolną.';
+          errEl.classList.remove('hidden');
+          return null;
+        }
+
+        passengers.push({ name, pesel, dob });
+      }
+
+      return passengers;
+    }
+
+    // Rezerwacja (bez logowania)
+    function reserveFlight() {
+      const flights = load(STORE_KEYS.flights);
+      const f = flights.find(x => x.id === currentFlightId);
+
+      if (!f) {
+        showError('reservationMsg', 'Lot nie istnieje.');
+        return;
+      }
+
+      const passengers = collectPassengers();
+      if (!passengers) return;
+
+      // Czy wystarczają miejsca?
+      if (passengers.length > f.seats) {
+        showError('reservationMsg', `Brak miejsc. Dostępne: ${f.seats}.`);
+        return;
+      }
+
+      // Zapis rezerwacji
+      const bookings = load(STORE_KEYS.bookings);
+      const bookingId = genId();
+      bookings.push({
+        id: bookingId,
+        flightId: f.id,
+        passengers,
+        status: 'ZAREZERWOWANY',
+        createdAt: new Date().toISOString()
+      });
+      save(STORE_KEYS.bookings, bookings);
+
+      // Zmniejsz liczbę miejsc
+      const idx = flights.findIndex(x => x.id === f.id);
+      flights[idx].seats -= passengers.length;
+      save(STORE_KEYS.flights, flights);
+
+      alert('Rezerwacja przyjęta! Zapłać na lotnisku przy odprawie.');
+
+      // Przejście do Moje loty i odświeżenie
+      show('my');
+      renderMyFlights();
+    }
+
+    // Druk prostego potwierdzenia (HTML to print)
+    function printReservation() {
+      window.print();
+    }
+
+    // Render „Moje loty”
+    function renderMyFlights() {
+      const bookings = load(STORE_KEYS.bookings);
+      const flights  = load(STORE_KEYS.flights);
+      const c        = $('#myFlights');
+      const empty    = $('#noMyFlights');
+
+      c.innerHTML = '';
+      empty.classList.toggle('hidden', bookings.length !== 0);
+
+      if (bookings.length === 0) return;
+
+      bookings.forEach(b => {
+        const f = flights.find(x => x.id === b.flightId);
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `
+          <div class="row">
+            <div>
+              <div class="title">${f ? `${f.from} → ${f.to}` : 'Lot usunięty'}</div>
+              <div>${f ? `${f.date}, ${f.time}` : '-'}</div>
+              <div class="help">Status: ${b.status}</div>
+            </div>
+            <div class="inline">
+              <button class="btn-muted" data-print="${b.id}">Drukuj</button>
+              <button class="btn-primary" data-edit="${b.id}">Edytuj pasażerów</button>
+              <button class="btn-danger" data-cancel="${b.id}">Anuluj rezerwację</button>
+            </div>
+          </div>
+          <div style="margin-top: 8px;">
+            <table aria-label="Pasażerowie">
+              <thead>
+                <tr><th>Imię i nazwisko</th><th>PESEL</th><th>Data urodzenia</th></tr>
+              </thead>
+              <tbody>
+                ${b.passengers.map(p => `
+                  <tr><td>${p.name}</td><td>${p.pesel}</td><td>${p.dob}</td></tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+
+        // Druk
+        div.querySelector(`[data-print="${b.id}"]`).addEventListener('click', () => {
+          printReservation();
+        });
+
+        // Edycja pasażerów
+        div.querySelector(`[data-edit="${b.id}"]`).addEventListener('click', () => {
+          editBookingPassengers(b.id);
+        });
+
+        // Anulowanie
+        div.querySelector(`[data-cancel="${b.id}"]`).addEventListener('click', () => {
+          cancelBooking(b.id);
+        });
+
+        c.appendChild(div);
+      });
+    }
+
+    // Edycja danych pasażerów w istniejącej rezerwacji
+    function editBookingPassengers(bookingId) {
+      const bookings = load(STORE_KEYS.bookings);
+      const idx = bookings.findIndex(b => b.id === bookingId);
+      if (idx < 0) return;
+
+      const b = bookings[idx];
+
+      // Pokaż prosty editor inline
+      const editor = document.createElement('div');
+      editor.className = 'card';
+      editor.innerHTML = `
+        <h3>Edycja pasażerów — rezerwacja ${bookingId}</h3>
+        <div id="editPassengersContainer"></div>
+        <div class="inline" style="margin-top: 10px;">
+          <button class="btn-success" id="savePassengersEditBtn">Zapisz zmiany</button>
+          <button class="btn-muted" id="cancelPassengersEditBtn">Zamknij</button>
+        </div>
+        <p id="editMsg" class="error hidden"></p>
+      `;
+
+      // Formularze
+      const cont = editor.querySelector('#editPassengersContainer');
+      b.passengers.forEach((p, i) => {
+        const block = document.createElement('div');
+        block.className = 'card';
+        block.innerHTML = `
+          <h4>Pasażer ${i + 1}</h4>
+          <label>Imię i nazwisko</label>
+          <input value="${p.name}" data-edit="name_${i}" />
+          <label>PESEL</label>
+          <input value="${p.pesel}" data-edit="pesel_${i}" />
+          <label>Data urodzenia</label>
+          <input type="date" value="${p.dob}" data-edit="dob_${i}" />
+          <p class="error hidden" data-edit-err="err_${i}"></p>
+        `;
+        cont.appendChild(block);
+      });
+
+      // Wstaw editor na górę sekcji „Moje loty”
+      $('#view-my').insertAdjacentElement('afterbegin', editor);
+
+      // Akcje
+      editor.querySelector('#cancelPassengersEditBtn').onclick = () => {
+        editor.remove();
+      };
+
+      editor.querySelector('#savePassengersEditBtn').onclick = () => {
+        const newPassengers = [];
+        for (let i = 0; i < b.passengers.length; i++) {
+          const name  = editor.querySelector(`[data-edit="name_${i}"]`).value.trim();
+          const pesel = editor.querySelector(`[data-edit="pesel_${i}"]`).value.trim();
+          const dob   = editor.querySelector(`[data-edit="dob_${i}"]`).value;
+
+          const errEl = editor.querySelector(`[data-edit-err="err_${i}"]`);
+          errEl.classList.add('hidden');
+          errEl.textContent = '';
+
+          if (!name || !pesel || !dob) {
+            errEl.textContent = 'Uzupełnij wszystkie pola.';
+            errEl.classList.remove('hidden');
+            return;
+          }
+          if (!validatePESEL(pesel)) {
+            errEl.textContent = 'Nieprawidłowy PESEL.';
+            errEl.classList.remove('hidden');
+            return;
+          }
+
+          newPassengers.push({ name, pesel, dob });
+        }
+
+        bookings[idx].passengers = newPassengers;
+        save(STORE_KEYS.bookings, bookings);
+        alert('Zaktualizowano dane pasażerów.');
+        editor.remove();
+        renderMyFlights();
+      };
+    }
+
+    // Anulowanie rezerwacji
+    function cancelBooking(bookingId) {
+      if (!confirm('Czy na pewno chcesz anulować tę rezerwację?')) return;
+
+      const bookings = load(STORE_KEYS.bookings);
+      const idx = bookings.findIndex(b => b.id === bookingId);
+      if (idx < 0) return;
+
+      const b = bookings[idx];
+      const flights = load(STORE_KEYS.flights);
+      const fIdx = flights.findIndex(x => x.id === b.flightId);
+
+      // Zwróć miejsca
+      if (fIdx >= 0) {
+        flights[fIdx].seats += b.passengers.length;
+        save(STORE_KEYS.flights, flights);
+      }
+
+      // Oznacz status
+      bookings[idx].status = 'ANULOWANY';
+      save(STORE_KEYS.bookings, bookings);
+
+      alert('Rezerwacja anulowana.');
+      renderMyFlights();
+    }
+
+    // Logowanie / wylogowanie (tylko do admina)
+    function login() {
+      const email = $('#loginEmail').value.trim();
+      const pass  = $('#loginPassword').value;
+      const users = load(STORE_KEYS.users);
+
+      const user = users.find(u => u.email === email && u.password === pass);
+      const msg  = $('#accountMsg');
+
+      if (!user) {
+        msg.textContent = 'Nieprawidłowy email lub hasło.';
+        return;
+      }
+      saveSession({ email: user.email });
+      refreshSessionUI();
+      msg.textContent = 'Zalogowano.';
+      if (user.email === ADMIN_EMAIL) {
+        show('admin');
+        renderAdmin();
+      }
+    }
+    function logout() {
+      localStorage.removeItem(STORE_KEYS.session);
+      refreshSessionUI();
+      $('#accountMsg').textContent = 'Wylogowano.';
+      show('home');
+    }
+
+    // Admin: render tabel
+    function renderAdmin() {
+      // Uprawnienia
+      const s = loadSession();
+      if (!s || s.email !== ADMIN_EMAIL) {
+        alert('Panel admina jest dostępny tylko dla administratora.');
+        show('home');
+        return;
+      }
+
+      const flights  = load(STORE_KEYS.flights);
+      const bookings = load(STORE_KEYS.bookings);
+
+      // Tabela lotów
+      const tbodyF = $('#adminFlightsTable tbody');
+      tbodyF.innerHTML = '';
+
+      flights.forEach(f => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${f.id}</td>
+          <td>${f.from} → ${f.to}</td>
+          <td>${f.date} ${f.time}</td>
+          <td>${f.price} PLN</td>
+          <td>${f.seats}</td>
+          <td class="inline">
+            <button class="btn-primary" data-edit="${f.id}">Edytuj</button>
+            <button class="btn-danger" data-del="${f.id}">Usuń</button>
+          </td>
+        `;
+
+        // Edycja
+        tr.querySelector(`[data-edit="${f.id}"]`).addEventListener('click', () => {
+          $('#admFrom').value  = f.from;
+          $('#admTo').value    = f.to;
+          $('#admDate').value  = f.date;
+          $('#admTime').value  = f.time;
+          $('#admPrice').value = f.price;
+          $('#admSeats').value = f.seats;
+          $('#saveFlightBtn').dataset.editId = f.id;
+          alert('Tryb edycji lotu: ' + f.id);
+        });
+
+        // Usunięcie
+        tr.querySelector(`[data-del="${f.id}"]`).addEventListener('click', () => {
+          if (!confirm('Usunąć lot ' + f.id + '?')) return;
+
+          const left = flights.filter(x => x.id !== f.id);
+          save(STORE_KEYS.flights, left);
+
+          // Powiązane rezerwacje oznacz jako „ANULOWANY”
+          const bks = load(STORE_KEYS.bookings);
+          bks.forEach(b => { if (b.flightId === f.id) b.status = 'ANULOWANY'; });
+          save(STORE_KEYS.bookings, bks);
+
+          renderAdmin();
+        });
+
+        tbodyF.appendChild(tr);
+      });
+
+      // Tabela rezerwacji
+      const tbodyB = $('#adminBookingsTable tbody');
+      tbodyB.innerHTML = '';
+      bookings.forEach(b => {
+        const f = flights.find(x => x.id === b.flightId);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${b.id}</td>
+          <td>${f ? (f.from + ' → ' + f.to + ' • ' + f.date + ' ' + f.time) : 'Lot usunięty'}</td>
+          <td>${b.passengers.map(p => p.name).join(', ')}</td>
+          <td>${b.status}</td>
+        `;
+        tbodyB.appendChild(tr);
+      });
+    }
+
+    // Admin: zapis lotu (dodaj/edytuj)
+    function saveFlight() {
+      const s = loadSession();
+      if (!s || s.email !== ADMIN_EMAIL) {
+        showError('adminFormMsg', 'Brak uprawnień. Zaloguj się jako administrator.');
+        return;
+      }
+
+      const from  = $('#admFrom').value.trim();
+      const to    = $('#admTo').value.trim();
+      const date  = $('#admDate').value.trim();
+      const time  = $('#admTime').value.trim();
+      const price = parseInt($('#admPrice').value, 10);
+      const seats = parseInt($('#admSeats').value, 10);
+
+      // Walidacja
+      const msg = $('#adminFormMsg');
+      msg.classList.add('hidden');
+      msg.textContent = '';
+
+      if (!from || !to || !date || !time || isNaN(price) || isNaN(seats) || seats < 1 || price < 0) {
+        showError('adminFormMsg', 'Uzupełnij poprawnie wszystkie pola.');
+        return;
+      }
+
+      const flights = load(STORE_KEYS.flights);
+      const editId  = $('#saveFlightBtn').dataset.editId;
+
+      if (editId) {
+        const idx = flights.findIndex(x => x.id === editId);
+        if (idx >= 0) {
+          flights[idx] = { id: editId, from, to, date, time, price, seats };
+          save(STORE_KEYS.flights, flights);
+          delete $('#saveFlightBtn').dataset.editId;
+          alert('Zaktualizowano lot: ' + editId);
+        }
+      } else {
+        const id = genId();
+        flights.push({ id, from, to, date, time, price, seats });
+        save(STORE_KEYS.flights, flights);
+        alert('Dodano lot: ' + id);
+      }
+
+      renderAdmin();
+      // Wyczyść formularz
+      clearFlightForm();
+      // Odśwież wyszukiwanie (jeśli otwarte)
+      if (!$('#view-search').classList.contains('hidden')) {
+        renderSearchResults();
+      }
+    }
+
+    // Admin: czyść formularz
+    function clearFlightForm() {
+      $('#admFrom').value  = '';
+      $('#admTo').value    = '';
+      $('#admDate').value  = '';
+      $('#admTime').value  = '';
+      $('#admPrice').value = '';
+      $('#admSeats').value = '';
+      delete $('#saveFlightBtn').dataset.editId;
+      $('#adminFormMsg').classList.add('hidden');
+      $('#adminFormMsg').textContent = '';
+    }
+
+    // Admin: eksport/import JSON
+    function exportData() {
+      const data = {
+        flights:  load(STORE_KEYS.flights),
+        bookings: load(STORE_KEYS.bookings)
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url;
+      a.download = 'oneair_data.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    function importData(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (!Array.isArray(data.flights) || !Array.isArray(data.bookings)) {
+            alert('Nieprawidłowy plik JSON.');
+            return;
+          }
+          save(STORE_KEYS.flights, data.flights);
+          save(STORE_KEYS.bookings, data.bookings);
+          alert('Zaimportowano dane.');
+          renderAdmin();
+          if (!$('#view-search').classList.contains('hidden')) {
+            renderSearchResults();
+          }
+        } catch {
+          alert('Nie udało się wczytać pliku JSON.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // Zdarzenia UI — nawigacja
+    $$('nav a, .cta').forEach(a => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        const view = a.dataset.view;
+        if (!view) return;
+
+        if (view === 'search') { renderSearchResults(); }
+        if (view === 'my')     { renderMyFlights();     }
+        if (view === 'admin')  { renderAdmin();         }
+
+        show(view);
+      });
+    });
+
+    // Zdarzenia wyszukiwania
+    $('#searchBtn').addEventListener('click', renderSearchResults);
+    $('#resetBtn').addEventListener('click', () => {
+      $('#fltFrom').value = '';
+      $('#fltTo').value   = '';
+      $('#fltDate').value = '';
+      renderSearchResults();
+    });
+
+    // Zdarzenia rezerwacji
+    $('#genFormBtn').addEventListener('click', generatePassengerForms);
+    $('#clearFormsBtn').addEventListener('click', clearPassengerForms);
+    $('#reserveBtn').addEventListener('click', reserveFlight);
+    $('#printBtn').addEventListener('click', printReservation);
+
+    // Zdarzenia konta
+    $('#loginBtn').addEventListener('click', login);
+    $('#logoutBtn').addEventListener('click', logout);
+
+    // Zdarzenia admina
+    $('#saveFlightBtn').addEventListener('click', saveFlight);
+    $('#clearFlightFormBtn').addEventListener('click', clearFlightForm);
+    $('#exportDataBtn').addEventListener('click', exportData);
+    $('#importDataBtn').addEventListener('click', () => $('#importFile').click());
+    $('#importFile').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) importData(file);
+      e.target.value = '';
+    });
+
+    // Start aplikacji
+    initUsers();
+    refreshSessionUI();
+    renderSearchResults();
+    renderMyFlights();
+  </script>
+</body>
+</html>
